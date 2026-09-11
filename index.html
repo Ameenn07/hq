@@ -4,6 +4,524 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HQ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f7f7f8;
+    color: #1a1a1a;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 13px; margin: 0 0 20px; }
+
+  /* Auth screen */
+  #authScreen {
+    max-width: 320px;
+    margin: 12vh auto 0;
+    text-align: center;
+  }
+  #authScreen h2 { font-size: 17px; margin-bottom: 6px; }
+  #authScreen p { font-size: 13px; color: #777; margin-bottom: 18px; }
+  .authInput {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid #d8d8dc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .authBtn {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: none;
+    border-radius: 8px;
+    background: #1a1a1a;
+    color: #fff;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  .authBtnAlt {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    border: 1px solid #d8d8dc;
+    border-radius: 8px;
+    background: #fff;
+    color: #444;
+    cursor: pointer;
+  }
+  #authError {
+    color: #c62828;
+    font-size: 12px;
+    margin-top: 8px;
+    min-height: 16px;
+  }
+  #authStatus {
+    color: #2e7d32;
+    font-size: 12px;
+    margin-top: 8px;
+    min-height: 16px;
+  }
+  #app { display: none; }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #signOutBtn {
+    font-size: 12px;
+    color: #777;
+    background: none;
+    border: 1px solid #d8d8dc;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+
+  .weeks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .week-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid #d8d8dc;
+    background: #fff;
+    color: #444;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .week-btn.active {
+    background: #1a1a1a;
+    color: #fff;
+    border-color: #1a1a1a;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  th, td {
+    padding: 10px 10px;
+    text-align: center;
+    font-size: 13px;
+    border-bottom: 1px solid #eee;
+  }
+  th {
+    background: #fafafa;
+    color: #555;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  td.action {
+    text-align: left;
+    font-weight: 500;
+    max-width: 240px;
+  }
+  input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: #1a1a1a;
+  }
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+    min-width: 90px;
+  }
+  .bar {
+    width: 50px;
+    height: 6px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: #2e7d32;
+  }
+  .bar-fill.low { background: #c62828; }
+  .bar-fill.mid { background: #e6a700; }
+  .pct { font-size: 12px; color: #555; width: 32px; text-align: right; }
+  .summary {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #555;
+  }
+  .footer-note {
+    margin-top: 20px;
+    font-size: 11px;
+    color: #999;
+  }
+  .toggleAuthMode {
+    font-size: 12px;
+    color: #666;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-top: 10px;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <h2>HQ</h2>
+  <p id="authSubtitle">Sign in to continue</p>
+  <input type="email" id="authEmail" class="authInput" placeholder="Email" autocomplete="username">
+  <input type="password" id="authPassword" class="authInput" placeholder="Password" autocomplete="current-password">
+  <button id="authPrimaryBtn" class="authBtn">Sign in</button>
+  <div id="authError"></div>
+  <div id="authStatus"></div>
+  <span class="toggleAuthMode" id="toggleAuthMode">Need an account? Sign up</span>
+  <br>
+  <span class="toggleAuthMode" id="forgotPasswordLink">Forgot password?</span>
+</div>
+
+<div id="recoverScreen" style="display:none; max-width:320px; margin:12vh auto 0; text-align:center;">
+  <h2>Set a new password</h2>
+  <p style="font-size:13px; color:#777; margin-bottom:18px;">Enter a new password for your account.</p>
+  <input type="password" id="newPassword" class="authInput" placeholder="New password" autocomplete="new-password">
+  <button id="setNewPasswordBtn" class="authBtn">Update password</button>
+  <div id="recoverError" style="color:#c62828; font-size:12px; margin-top:8px; min-height:16px;"></div>
+  <div id="recoverStatus" style="color:#2e7d32; font-size:12px; margin-top:8px; min-height:16px;"></div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <h1>Behavioral Tracker</h1>
+    <button id="signOutBtn">Sign out</button>
+  </div>
+  <p class="sub">Weeks 1–10 &middot; tap a checkbox to toggle &middot; synced to your account, works across devices</p>
+
+  <div class="weeks" id="weekTabs"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Action</th>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+        <th>Target/wk</th>
+        <th>Done/wk</th>
+        <th>Progress</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <p class="footer-note" id="loadingNote"></p>
+</div>
+
+<script>
+  // ---- Supabase setup ----
+  const SUPABASE_URL = "https://ikxtkyaszrmgkowxhofv.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_ozy7k2qMTWN96u4zXfAY8Q_Enajnvx2";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const ACTIONS = [
+    { action: "Handled binge urge (or urge-free day)", target: 7 },
+    { action: "Handled porn urge (or urge-free day)", target: 7 },
+    { action: "Prayed ≥1x", target: 7 },
+    { action: "30min+ of educational work", target: 7 },
+    { action: "Workout", target: 4 }
+  ];
+  const NUM_WEEKS = 10;
+
+  let isSignUpMode = false;
+  let currentWeek = 1;
+  let data = {}; // { [week]: [{id, action, target, days}, ...] }
+
+  // ---- Auth UI ----
+  const authEmail = document.getElementById("authEmail");
+  const authPassword = document.getElementById("authPassword");
+  const authError = document.getElementById("authError");
+  const authStatus = document.getElementById("authStatus");
+  const authPrimaryBtn = document.getElementById("authPrimaryBtn");
+  const authSubtitle = document.getElementById("authSubtitle");
+  const toggleAuthMode = document.getElementById("toggleAuthMode");
+
+  toggleAuthMode.addEventListener("click", () => {
+    isSignUpMode = !isSignUpMode;
+    authPrimaryBtn.textContent = isSignUpMode ? "Sign up" : "Sign in";
+    authSubtitle.textContent = isSignUpMode ? "Create your account" : "Sign in to continue";
+    toggleAuthMode.textContent = isSignUpMode ? "Already have an account? Sign in" : "Need an account? Sign up";
+    authError.textContent = "";
+    authStatus.textContent = "";
+  });
+
+  authPrimaryBtn.addEventListener("click", async () => {
+    authError.textContent = "";
+    authStatus.textContent = "";
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    if (!email || !password) {
+      authError.textContent = "Enter both email and password.";
+      return;
+    }
+    authPrimaryBtn.disabled = true;
+    authPrimaryBtn.textContent = "Please wait...";
+    try {
+      if (isSignUpMode) {
+        const { data: signUpData, error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        if (signUpData.session) {
+          await onSignedIn();
+        } else {
+          authStatus.textContent = "Check your email to confirm your account, then sign in.";
+        }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        await onSignedIn();
+      }
+    } catch (e) {
+      authError.textContent = e.message || "Something went wrong.";
+    } finally {
+      authPrimaryBtn.disabled = false;
+      authPrimaryBtn.textContent = isSignUpMode ? "Sign up" : "Sign in";
+    }
+  });
+
+  document.getElementById("forgotPasswordLink").addEventListener("click", async () => {
+    authError.textContent = "";
+    authStatus.textContent = "";
+    const email = authEmail.value.trim();
+    if (!email) {
+      authError.textContent = "Enter your email above first, then click Forgot password.";
+      return;
+    }
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href.split("#")[0].split("?")[0]
+    });
+    if (error) {
+      authError.textContent = error.message;
+    } else {
+      authStatus.textContent = "Check your email for a password reset link.";
+    }
+  });
+
+  document.getElementById("setNewPasswordBtn").addEventListener("click", async () => {
+    const recoverError = document.getElementById("recoverError");
+    const recoverStatus = document.getElementById("recoverStatus");
+    recoverError.textContent = "";
+    recoverStatus.textContent = "";
+    const newPassword = document.getElementById("newPassword").value;
+    if (!newPassword || newPassword.length < 6) {
+      recoverError.textContent = "Password must be at least 6 characters.";
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: newPassword });
+    if (error) {
+      recoverError.textContent = error.message;
+    } else {
+      recoverStatus.textContent = "Password updated. Redirecting...";
+      setTimeout(() => {
+        document.getElementById("recoverScreen").style.display = "none";
+        onSignedIn();
+      }, 1200);
+    }
+  });
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      document.getElementById("authScreen").style.display = "none";
+      document.getElementById("app").style.display = "none";
+      document.getElementById("recoverScreen").style.display = "block";
+    }
+  });
+
+  document.getElementById("signOutBtn").addEventListener("click", async () => {
+    await sb.auth.signOut();
+    document.getElementById("app").style.display = "none";
+    document.getElementById("authScreen").style.display = "block";
+    authEmail.value = "";
+    authPassword.value = "";
+  });
+
+  // ---- App logic ----
+  function blankDays() {
+    return [false,false,false,false,false,false,false];
+  }
+
+  async function seedRowsForUser(userId) {
+    const rows = [];
+    for (let w = 1; w <= NUM_WEEKS; w++) {
+      for (const a of ACTIONS) {
+        rows.push({ user_id: userId, week: w, action: a.action, target: a.target, days: blankDays() });
+      }
+    }
+    const { error } = await sb.from("tracker_data").insert(rows);
+    if (error) throw error;
+  }
+
+  async function loadData() {
+    const { data: userData } = await sb.auth.getUser();
+    const userId = userData.user.id;
+
+    let { data: rows, error } = await sb.from("tracker_data").select("*");
+    if (error) throw error;
+
+    if (!rows || rows.length === 0) {
+      document.getElementById("loadingNote").textContent = "Setting up your tracker for the first time...";
+      await seedRowsForUser(userId);
+      const res = await sb.from("tracker_data").select("*");
+      rows = res.data;
+      document.getElementById("loadingNote").textContent = "";
+    }
+
+    const byWeek = {};
+    for (let w = 1; w <= NUM_WEEKS; w++) byWeek[w] = [];
+    rows.forEach(r => {
+      if (!byWeek[r.week]) byWeek[r.week] = [];
+      byWeek[r.week].push(r);
+    });
+
+    // sort each week's rows into the canonical action order
+    for (let w = 1; w <= NUM_WEEKS; w++) {
+      byWeek[w].sort((a, b) => {
+        const ia = ACTIONS.findIndex(x => x.action === a.action);
+        const ib = ACTIONS.findIndex(x => x.action === b.action);
+        return ia - ib;
+      });
+    }
+    data = byWeek;
+  }
+
+  function renderTabs() {
+    const wrap = document.getElementById("weekTabs");
+    wrap.innerHTML = "";
+    for (let w = 1; w <= NUM_WEEKS; w++) {
+      const btn = document.createElement("button");
+      btn.className = "week-btn" + (w === currentWeek ? " active" : "");
+      btn.textContent = "Week " + w;
+      btn.onclick = () => { currentWeek = w; render(); };
+      wrap.appendChild(btn);
+    }
+  }
+
+  function pctClass(pct) {
+    if (pct >= 85) return "";
+    if (pct >= 50) return "mid";
+    return "low";
+  }
+
+  async function toggleDay(row, dayIdx, checked) {
+    row.days[dayIdx] = checked;
+    const { error } = await sb.from("tracker_data")
+      .update({ days: row.days, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    if (error) {
+      console.error(error);
+    }
+  }
+
+  function render() {
+    renderTabs();
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+    let totalDone = 0, totalTarget = 0;
+
+    (data[currentWeek] || []).forEach((row) => {
+      const tr = document.createElement("tr");
+
+      const tdAction = document.createElement("td");
+      tdAction.className = "action";
+      tdAction.textContent = row.action;
+      tr.appendChild(tdAction);
+
+      row.days.forEach((checked, dayIdx) => {
+        const td = document.createElement("td");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = checked;
+        cb.onchange = async () => {
+          await toggleDay(row, dayIdx, cb.checked);
+          render();
+        };
+        td.appendChild(cb);
+        tr.appendChild(td);
+      });
+
+      const tdTarget = document.createElement("td");
+      tdTarget.textContent = row.target;
+      tr.appendChild(tdTarget);
+
+      const done = row.days.filter(Boolean).length;
+      totalDone += done;
+      totalTarget += row.target;
+
+      const tdDone = document.createElement("td");
+      tdDone.textContent = done;
+      tr.appendChild(tdDone);
+
+      const pct = row.target > 0 ? Math.round((done / row.target) * 100) : 0;
+      const tdProgress = document.createElement("td");
+      const wrap = document.createElement("div");
+      wrap.className = "progress-wrap";
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      const fill = document.createElement("div");
+      fill.className = "bar-fill " + pctClass(pct);
+      fill.style.width = Math.min(pct, 100) + "%";
+      bar.appendChild(fill);
+      const pctLabel = document.createElement("span");
+      pctLabel.className = "pct";
+      pctLabel.textContent = pct + "%";
+      wrap.appendChild(bar);
+      wrap.appendChild(pctLabel);
+      tdProgress.appendChild(wrap);
+      tr.appendChild(tdProgress);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function onSignedIn() {
+    document.getElementById("authScreen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("loadingNote").textContent = "Loading your data...";
+    try {
+      await loadData();
+      document.getElementById("loadingNote").textContent = "";
+      render();
+    } catch (e) {
+      document.getElementById("loadingNote").textContent = "Error loading data: " + e.message;
+    }
+  }
+
+  // ---- On page load, check for an existing session ----
+  const isRecoveryFlow = window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+  (async () => {
+    if (isRecoveryFlow) return; // let the PASSWORD_RECOVERY auth event handle this instead
+    const { data: sessionData } = await sb.auth.getSession();
+    if (sessionData.session) {
+      await onSignedIn();
+    }
+  })();
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQ</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>
 <style>
   :root { color-scheme: light; }
