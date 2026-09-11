@@ -189,6 +189,17 @@
   <div id="authError"></div>
   <div id="authStatus"></div>
   <span class="toggleAuthMode" id="toggleAuthMode">Need an account? Sign up</span>
+  <br>
+  <span class="toggleAuthMode" id="forgotPasswordLink">Forgot password?</span>
+</div>
+
+<div id="recoverScreen" style="display:none; max-width:320px; margin:12vh auto 0; text-align:center;">
+  <h2>Set a new password</h2>
+  <p style="font-size:13px; color:#777; margin-bottom:18px;">Enter a new password for your account.</p>
+  <input type="password" id="newPassword" class="authInput" placeholder="New password" autocomplete="new-password">
+  <button id="setNewPasswordBtn" class="authBtn">Update password</button>
+  <div id="recoverError" style="color:#c62828; font-size:12px; margin-top:8px; min-height:16px;"></div>
+  <div id="recoverStatus" style="color:#2e7d32; font-size:12px; margin-top:8px; min-height:16px;"></div>
 </div>
 
 <div id="app">
@@ -283,6 +294,54 @@
     } finally {
       authPrimaryBtn.disabled = false;
       authPrimaryBtn.textContent = isSignUpMode ? "Sign up" : "Sign in";
+    }
+  });
+
+  document.getElementById("forgotPasswordLink").addEventListener("click", async () => {
+    authError.textContent = "";
+    authStatus.textContent = "";
+    const email = authEmail.value.trim();
+    if (!email) {
+      authError.textContent = "Enter your email above first, then click Forgot password.";
+      return;
+    }
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href.split("#")[0].split("?")[0]
+    });
+    if (error) {
+      authError.textContent = error.message;
+    } else {
+      authStatus.textContent = "Check your email for a password reset link.";
+    }
+  });
+
+  document.getElementById("setNewPasswordBtn").addEventListener("click", async () => {
+    const recoverError = document.getElementById("recoverError");
+    const recoverStatus = document.getElementById("recoverStatus");
+    recoverError.textContent = "";
+    recoverStatus.textContent = "";
+    const newPassword = document.getElementById("newPassword").value;
+    if (!newPassword || newPassword.length < 6) {
+      recoverError.textContent = "Password must be at least 6 characters.";
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: newPassword });
+    if (error) {
+      recoverError.textContent = error.message;
+    } else {
+      recoverStatus.textContent = "Password updated. Redirecting...";
+      setTimeout(() => {
+        document.getElementById("recoverScreen").style.display = "none";
+        onSignedIn();
+      }, 1200);
+    }
+  });
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      document.getElementById("authScreen").style.display = "none";
+      document.getElementById("app").style.display = "none";
+      document.getElementById("recoverScreen").style.display = "block";
     }
   });
 
@@ -447,7 +506,9 @@
     }
   }
 
+  const isRecoveryFlow = window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
   (async () => {
+    if (isRecoveryFlow) return;
     const { data: sessionData } = await sb.auth.getSession();
     if (sessionData.session) {
       await onSignedIn();
