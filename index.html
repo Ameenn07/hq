@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HQ</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -224,7 +224,6 @@
     <tbody id="tbody"></tbody>
   </table>
 
-  <div class="summary" id="weekSummary"></div>
   <p class="footer-note" id="loadingNote"></p>
 </div>
 
@@ -245,8 +244,9 @@
 
   let isSignUpMode = false;
   let currentWeek = 1;
-  let data = {};
+  let data = {}; // { [week]: [{id, action, target, days}, ...] }
 
+  // ---- Auth UI ----
   const authEmail = document.getElementById("authEmail");
   const authPassword = document.getElementById("authPassword");
   const authError = document.getElementById("authError");
@@ -353,6 +353,7 @@
     authPassword.value = "";
   });
 
+  // ---- App logic ----
   function blankDays() {
     return [false,false,false,false,false,false,false];
   }
@@ -390,6 +391,7 @@
       byWeek[r.week].push(r);
     });
 
+    // sort each week's rows into the canonical action order
     for (let w = 1; w <= NUM_WEEKS; w++) {
       byWeek[w].sort((a, b) => {
         const ia = ACTIONS.findIndex(x => x.action === a.action);
@@ -487,10 +489,6 @@
 
       tbody.appendChild(tr);
     });
-
-    const overallPct = totalTarget > 0 ? Math.round((totalDone / totalTarget) * 100) : 0;
-    document.getElementById("weekSummary").textContent =
-      "Week " + currentWeek + " total: " + totalDone + " / " + totalTarget + " (" + overallPct + "%)";
   }
 
   async function onSignedIn() {
@@ -506,9 +504,10 @@
     }
   }
 
+  // ---- On page load, check for an existing session ----
   const isRecoveryFlow = window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
   (async () => {
-    if (isRecoveryFlow) return;
+    if (isRecoveryFlow) return; // let the PASSWORD_RECOVERY auth event handle this instead
     const { data: sessionData } = await sb.auth.getSession();
     if (sessionData.session) {
       await onSignedIn();
